@@ -1,0 +1,20 @@
+--find-links https://download.pytorch.org/whl/cu113/torch_stable.html
+black==22.10.0
+flake8==6.0.0
+isort==5.10.1
+numpy==1.22.3
+pandas==1.4.2
+Pillow==9.3.0
+pyflakes==3.0.1
+scipy==1.9.3
+tqdm==4.63.0
+wandb==0.13.5
+matplotlib==3.1
+opencv-python==4.5.5.64
+opencv-python-headless==4.6.0.66
+torch==1.10.2+cu113
+torchvision==0.11.3+cu113
+torchmetrics==0.7.2
+torchsummary==1.5.1
+pytorch-lightning==1.5.10
+scikit-learn==1.0.2
