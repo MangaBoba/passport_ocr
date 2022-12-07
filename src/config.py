@@ -1,6 +1,6 @@
 common_config = {
-    "data_dir": "/home/mangaboba/environ/passport_ocr/data",
-    "img_width": 100,
+    "data_dir": "/home/mangaboba/environ/passport_ocr/data/images",
+    "img_width": 96,
     "img_height": 32,
     "map_to_seq_hidden": 64,
     "rnn_hidden": 256,
@@ -13,8 +13,7 @@ train_config = {
     "eval_batch_size": 256,
     "lr": 0.0005,
     "cpu_workers": 4,
-    "valid_max_iter": 100,
-    "beam_size": 10,
+    "jit_pth": ".",
     "checkpoints_dir": "checkpoints/",
 }
 train_config.update(common_config)

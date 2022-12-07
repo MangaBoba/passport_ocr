@@ -1,33 +1,30 @@
-# import os
+import os
 
-# import cv2
 import numpy as np
 import pytorch_lightning as pl
 import torch
 import wandb
 from pytorch_lightning.callbacks import Callback, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-# import torch.optim as optim
+
 from torch.nn import CTCLoss
 from torch.utils.data import DataLoader
 from torchmetrics import Accuracy
+from pathlib import Path
+from torch import optim
 
 from config import train_config as config
-# from evaluate import evaluate
 from dataset import SynthDataset, collate_fn, splitter
 from model import CRNN
 
 
+torch.backends.cudnn.enabled = False
+
 class SaveFianlModel(Callback):
 
-    # def on_train_end(self, trainer, pl_module):
-
-    #     sample = torch.rand(1, 1, 32, 100).cuda()
-    #     scripted_model = torch.jit.trace(pl_module.model.eval(), sample)
-    #     scripted_model.save('./CRNN_scripted_finish.pth')
-    #     print('Jit cuda model created!')
-    def __init__(self):
+    def __init__(self, pth):
         super().__init__()
+        self.pth = pth
         self.best_loss = 1000000000
 
     def on_validation_epoch_end(self, trainer, pl_module):
@@ -35,10 +32,9 @@ class SaveFianlModel(Callback):
         loss = trainer.callback_metrics["loss_val"]
         if loss < self.best_loss:
             self.best_loss = loss
-            sample = torch.rand(1, 1, 32, 100).cuda()
+            sample = torch.rand(1, 1, 32, 96).cuda()
             scripted_model = torch.jit.trace(pl_module.model.eval(), sample)
-            scripted_model.save("./CRNN_scripted.pth")
-            print(f"Jit cuda model saved with {loss} val_loss!")
+            scripted_model.save(f'{self.pth}_{loss:.2f}vl_CRNN_custom_tuned_augs.pth')
 
 
 class PLWrap(pl.LightningModule):
@@ -48,7 +44,7 @@ class PLWrap(pl.LightningModule):
 
     def __init__(self, model, lr):
         super().__init__()
-        self.lr
+        self.lr = lr
         self.model = model
         self.save_hyperparameters()
         self.acc = Accuracy()
@@ -102,7 +98,6 @@ class PLWrap(pl.LightningModule):
             self.model.parameters(), 5
         )  # gradient clipping with 5
 
-        # print(type(log_probs))
         preds = self.ctc_decode(log_probs.detach())
         target_lengths = target_lengths.cpu().numpy().tolist()
         reals = targets.cpu().numpy().tolist()
@@ -174,9 +169,14 @@ class PLWrap(pl.LightningModule):
         }
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-
-        return {"optimizer": optimizer}
+        optimizer = torch.optim.AdamW(self.model.parameters(), 
+                                      weight_decay=0.0001, lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, 
+                          milestones=[5], gamma=0.5)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler,
+        }
 
 
 def main():
@@ -198,11 +198,16 @@ def main():
 
     (train_pairs, test_pairs) = splitter(data_dir, 0.2)
 
+    RUS_LETTERS = "АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя"
+    NUMBERS = "0123456789"
+    PUNCTUATION_MARKS = ' .,?:;—!<>-«»()[]*"'
+    voc = RUS_LETTERS + NUMBERS + PUNCTUATION_MARKS
+
     train_dataset = SynthDataset(
-        pairs=train_pairs, train_mode=True, img_height=img_height, img_width=img_width
+        pairs=train_pairs, train_mode=True, img_height=img_height, img_width=img_width, voc=voc
     )
     valid_dataset = SynthDataset(
-        pairs=test_pairs, train_mode=False, img_height=img_height, img_width=img_width
+        pairs=test_pairs, train_mode=False, img_height=img_height, img_width=img_width, voc=voc
     )
 
     train_loader = DataLoader(
@@ -221,7 +226,7 @@ def main():
         collate_fn=collate_fn,
     )
 
-    num_class = len(SynthDataset.LABEL2CHAR) + 1
+    num_class = len(voc) + 1
 
     crnn = CRNN(
         1,
@@ -232,6 +237,13 @@ def main():
         rnn_hidden=config["rnn_hidden"],
         leaky_relu=config["leaky_relu"],
     )
+    
+    jit_lodel = torch.jit.load('/home/mangaboba/environ/passport_ocr/_0.33vl_CRNN128_sctipted.pth')
+    model_dict = jit_lodel.state_dict()
+    crnn.load_state_dict(model_dict)
+    del jit_lodel
+    del model_dict
+
     model = PLWrap(crnn, lr)
 
     wandb.login(key=os.environ['WANDB_KEY'].strip())
@@ -256,7 +268,7 @@ def main():
         max_epochs=epochs,
         max_steps=-1,
         logger=[wandb_logger],
-        callbacks=[val_checkpoint, SaveFianlModel()],
+        callbacks=[val_checkpoint, SaveFianlModel(config["jit_pth"])],
         strategy="ddp",
     )
     trainer.fit(model, train_loader, valid_loader)
