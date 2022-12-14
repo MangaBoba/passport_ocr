@@ -201,7 +201,7 @@ def main():
     RUS_LETTERS = "АаБбВвГгДдЕеЁёЖжЗзИиЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЪъЫыЬьЭэЮюЯя"
     NUMBERS = "0123456789"
     PUNCTUATION_MARKS = ' .,?:;—!<>-«»()[]*"'
-    voc = RUS_LETTERS + NUMBERS + PUNCTUATION_MARKS
+    voc = NUMBERS + RUS_LETTERS + PUNCTUATION_MARKS
 
     train_dataset = SynthDataset(
         pairs=train_pairs, train_mode=True, img_height=img_height, img_width=img_width, voc=voc
