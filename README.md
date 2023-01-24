@@ -15,5 +15,5 @@ Limitations of solution:
 1. Only aligned data recognition (±5 degrees).
 2. Good recognition quality only for upper case letter words.
 
-ToDo: \
-- [ ] Name, surname and patronymic among the recognized words.
+ToDo:
+- [ ] Name, surname and patronymic search among the recognized words.
